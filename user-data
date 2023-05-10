@@ -1,0 +1,57 @@
+
+#!/bin/bash
+
+# varaible will be populated by terraform template
+  db_username=${db_username}
+  db_user_password=${db_user_password}
+  db_name=${db_name}
+  db_RDS=${db_RDS}
+  
+  echo "*** Installing httpd"
+  yum install httpd -y
+  rm /var/www/html/index.html
+
+  echo "*** Installing php"
+  amazon-linux-extras enable php7.4
+  yum clean metadata
+  yum -y install php php-{pear,cgi,common,curl,mbstring,gd,mysqlnd,gettext,bcmath,json,xml,fpm,intl,zip,imap}
+  
+  ## Installing mariadb
+  yum -y install mariadb.x86_64
+  
+  ## start services
+  systemctl start httpd
+  systemctl enable --now httpd
+  
+
+##  Download wordpress package and extract
+  wget https://wordpress.org/latest.tar.gz
+  tar -xzf latest.tar.gz
+  cp -rf wordpress/* /var/www/html/
+  usermod -a -G apache ec2-user
+  chown -R ec2-user:apache /var/www
+## Create wordpress configuration file and update database value
+  cd /var/www/html/
+  cp wp-config-sample.php wp-config.php
+  sed -i "s/database_name_here/$db_name/g" wp-config.php
+  sed -i "s/username_here/$db_username/g" wp-config.php
+  sed -i "s/password_here/$db_user_password/g" wp-config.php
+  sed -i "s/localhost/$db_RDS/g" wp-config.php
+  
+
+## add permission
+ 
+  usermod -a -G apache root
+  chown -R root:apache /var/www
+  
+
+# enable .htaccess files in Apache config using sed command
+sed -i '/<Directory "\/var\/www\/html">/,/<\/Directory>/ s/AllowOverride None/AllowOverride all/' /etc/httpd/conf/httpd.conf
+
+
+ 
+# restart apache
+
+systemctl restart httpd
+echo WordPress Installed
+EOF
